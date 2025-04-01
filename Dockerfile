@@ -1,35 +1,30 @@
-# Rustの公式イメージを使う
-FROM rust:1.73 as builder
+# Rustのslim-bullseyeイメージを使用
+FROM rust:slim-bullseye AS builder
 
-# 作業ディレクトリを設定
+# 作業ディレクトリを作成
 WORKDIR /app
 
-# Cargo.toml と Cargo.lock をコピー（依存関係をキャッシュするため）
+# 依存関係をコピー（キャッシュを活用）
 COPY Cargo.toml Cargo.lock ./
-
-# 依存関係を先にダウンロード（キャッシュを活用）
 RUN cargo fetch
 
 # ソースコードをコピー
-COPY src ./src
+COPY . .
 
-# リリースビルド（最適化されたバイナリを作成）
+# リリースビルド
 RUN cargo build --release
 
-# 実行環境として軽量なAlpine Linuxを使用
+# 実行環境のベースイメージ
 FROM debian:bullseye-slim
 
-# 必要なライブラリをインストール
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# 必要なライブラリをインストール（SSL対応のため ca-certificates）
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # 作業ディレクトリを設定
 WORKDIR /app
 
-# Rustのバイナリをコピー
-COPY --from=builder /app/target/release/axum-app .
+# ビルド済みバイナリをコピー
+COPY --from=builder /app/target/release/rust-axum-app /app/rust-axum-app
 
-# ポートを公開（Dockerコンテナ内部のポートを指定）
-EXPOSE 8000
-
-# アプリを実行
-CMD ["./axum-app"]
+# 実行
+CMD ["/app/rust-axum-app"]
